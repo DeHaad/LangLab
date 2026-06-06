@@ -495,3 +495,10 @@
     display: block;
   }
 }
+
+/* Tuzatish: yashirin auth forma inputlarni to'sib qo'ymasligi uchun */
+.auth-form { position: relative; }
+.sign-in-form { pointer-events: auto; }
+.sign-up-form { pointer-events: none; }
+.auth-container.sign-up-mode .sign-in-form { pointer-events: none; }
+.auth-container.sign-up-mode .sign-up-form { pointer-events: auto; }
