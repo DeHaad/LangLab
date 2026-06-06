@@ -1,0 +1,288 @@
+// CertLingo ma'lumotlar bazasi sxemasi (PostgreSQL)
+// Yo'l xaritasidagi "5. Ma'lumotlar bazasi" bo'limiga to'liq mos.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Interfeys tillari
+enum UiLocale {
+  uz
+  ru
+  en
+}
+
+enum Plan {
+  free
+  premium
+}
+
+enum Role {
+  user
+  admin
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+// Test bo'limlari (Telc formati)
+enum Skill {
+  reading   // Lesen
+  listening // Hoeren
+  writing   // Schreiben
+  speaking  // Sprechen
+}
+
+enum AttemptStatus {
+  in_progress
+  submitted
+  evaluated
+}
+
+// ---- Foydalanuvchi ----
+model User {
+  id             String   @id @default(cuid())
+  telegramId     String?  @unique
+  email          String?  @unique
+  name           String?
+  uiLocale       UiLocale @default(uz) // interfeys tili
+  learningLangId String?                // o'rganayotgan til
+  plan           Plan     @default(free)
+  role           Role     @default(user)
+  targetLevel    CefrLevel @default(B2)
+  examDate       DateTime?
+  streak         Int      @default(0)
+  xp             Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  learningLang   Language? @relation(fields: [learningLangId], references: [id])
+  attempts       Attempt[]
+  evaluations    AiEvaluation[]
+  progress       Progress[]
+  subscription   Subscription?
+  payments       Payment[]
+  errorLogs      ErrorLog[]
+
+  @@map("users")
+}
+
+// ---- Tillar ----
+model Language {
+  id           String        @id @default(cuid())
+  code         String        @unique // de, en, es...
+  name         String                  // Nemis tili
+  flag         String?                 // emoji
+  certificates Certificate[]
+  questions    Question[]
+  vocabulary   Vocabulary[]
+  users        User[]
+
+  @@map("languages")
+}
+
+// ---- Sertifikatlar (Telc, Goethe, IELTS...) ----
+model Certificate {
+  id         String     @id @default(cuid())
+  languageId String
+  code       String     // telc_b1, telc_b2
+  name       String     // Telc B1
+  level      CefrLevel
+  isActive   Boolean    @default(true)
+  language   Language   @relation(fields: [languageId], references: [id])
+  questions  Question[]
+  tests      Test[]
+
+  @@unique([languageId, code])
+  @@map("certificates")
+}
+
+// ---- Savollar ----
+model Question {
+  id            String      @id @default(cuid())
+  languageId    String
+  certificateId String
+  skill         Skill
+  level         CefrLevel
+  prompt        String              // savol matni / topshiriq
+  passage       String?             // o'qish/eshitish matni
+  audioUrl      String?             // listening uchun (object storage)
+  options       Json?               // variant javoblar (reading/listening)
+  correctAnswer Json?               // to'g'ri javob(lar) (avto tekshirish)
+  rubric        String?             // writing/speaking baholash mezoni
+  points        Int         @default(1)
+  createdAt     DateTime    @default(now())
+
+  language      Language    @relation(fields: [languageId], references: [id])
+  certificate   Certificate @relation(fields: [certificateId], references: [id])
+  answers       Answer[]
+  errorLogs     ErrorLog[]
+
+  @@index([certificateId, skill, level])
+  @@map("questions")
+}
+
+// ---- Testlar (savollar to'plami) ----
+model Test {
+  id            String      @id @default(cuid())
+  certificateId String
+  skill         Skill
+  title         String
+  durationMin   Int         @default(30)
+  certificate   Certificate @relation(fields: [certificateId], references: [id])
+  attempts      Attempt[]
+
+  @@map("tests")
+}
+
+// ---- Test urinishlari ----
+model Attempt {
+  id          String        @id @default(cuid())
+  userId      String
+  testId      String
+  status      AttemptStatus @default(in_progress)
+  score       Float?
+  maxScore    Float?
+  startedAt   DateTime      @default(now())
+  submittedAt DateTime?
+
+  user        User          @relation(fields: [userId], references: [id])
+  test        Test          @relation(fields: [testId], references: [id])
+  answers     Answer[]
+  evaluation  AiEvaluation?
+
+  @@index([userId])
+  @@map("attempts")
+}
+
+// ---- Javoblar ----
+model Answer {
+  id         String   @id @default(cuid())
+  attemptId  String
+  questionId String
+  response   Json     // foydalanuvchi javobi (matn / tanlov / audio url)
+  isCorrect  Boolean?
+  points     Float?
+  attempt    Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id])
+
+  @@map("answers")
+}
+
+// ---- AI baholash natijalari ----
+model AiEvaluation {
+  id          String   @id @default(cuid())
+  userId      String
+  attemptId   String   @unique
+  skill       Skill
+  score       Float
+  maxScore    Float
+  feedback    String   // interfeys tilida tushuntirish
+  corrections Json?    // xatolar ro'yxati
+  model       String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  attempt     Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("ai_evaluations")
+}
+
+// ---- Lug'at (flashcards) ----
+model Vocabulary {
+  id          String    @id @default(cuid())
+  languageId  String
+  level       CefrLevel
+  word        String
+  translation String
+  example     String?
+  topic       String?
+  language    Language  @relation(fields: [languageId], references: [id])
+  progress    Progress[]
+
+  @@map("vocabulary")
+}
+
+// ---- O'rganish progressi (spaced repetition) ----
+model Progress {
+  id           String      @id @default(cuid())
+  userId       String
+  vocabularyId String
+  ease         Float       @default(2.5) // SM-2 algoritmi
+  intervalDays Int         @default(0)
+  dueAt        DateTime    @default(now())
+  reps         Int         @default(0)
+  user         User        @relation(fields: [userId], references: [id])
+  vocabulary   Vocabulary  @relation(fields: [vocabularyId], references: [id])
+
+  @@unique([userId, vocabularyId])
+  @@map("progress")
+}
+
+// ---- Obuna ----
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  plan      Plan     @default(free)
+  startedAt DateTime @default(now())
+  expiresAt DateTime?
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("subscriptions")
+}
+
+// ---- To'lovlar ----
+model Payment {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  String   // payme | click | stripe
+  amount    Int      // tiyin / cent
+  currency  String   @default("UZS")
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("payments")
+}
+
+// ---- Xato jurnali (qayta mashq uchun) ----
+model ErrorLog {
+  id           String    @id @default(cuid())
+  userId       String
+  questionId   String
+  response     Json?
+  repetition   Int       @default(0)
+  status       String    @default("active")
+  nextReviewAt DateTime?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+  question     Question @relation(fields: [questionId], references: [id])
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("error_log")
+}
+
+// ---- E'lonlar (admin -> foydalanuvchilar) ----
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("announcements")
+}

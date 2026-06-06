@@ -1,0 +1,45 @@
+{
+  "name": "certlingo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangLab — xalqaro til sertifikatlariga AI yordamida tayyorgarlik platformasi (sayt + Telegram Mini App)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate",
+    "bot": "tsx bot/index.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1",
+    "jose": "^5.6.3",
+    "next": "14.2.5",
+    "openai": "^4.56.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "telegraf": "^4.16.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "prisma": "^5.18.0",
+    "tailwindcss": "^3.4.7",
+    "tsx": "^4.16.5",
+    "typescript": "^5.5.4"
+  }
+}
