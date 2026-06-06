@@ -39,7 +39,7 @@ async function setup() {
   }
 }
 
-function sendApp(ctx: Parameters<Parameters<typeof bot.start>[0]>[0]) {
+function sendApp(ctx: any) {
   if (isHttps) {
     return ctx.reply(WELCOME + "\n\nQuyidagi tugma orqali ilovani oching:", openKeyboard())
   }
