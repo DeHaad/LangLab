@@ -1,4 +1,4 @@
-# CertLingo 🎓
+# CertLingo 🎓(LangLab)
 
 Xalqaro til sertifikatlariga **AI yordamida** tayyorgarlik platformasi. Sayt + Telegram Mini App bitta backend API'dan foydalanadi.
 
